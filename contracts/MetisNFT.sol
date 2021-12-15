@@ -35,14 +35,12 @@ contract MetisNFT is ERC721Enumerable, Ownable {
     uint256 PRICE_DIFF_TRAX = 10000000000000000000;
 
     //address
-    address public mooseAddress;
     address public traxAddress;
     address public libraryAddress;
     address _owner;
 
-    constructor(address _mooseAddress, address _traxAddress, address _libraryAddress) ERC721("Frame", "FRAME") {
+    constructor(address _traxAddress, address _libraryAddress) ERC721("Frame", "FRAME") {
         _owner = msg.sender;
-        setMooseAddress(_mooseAddress);
         setTraxAddress(_traxAddress);
         setLibraryAddress(_libraryAddress);
 
@@ -575,15 +573,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
  \___/   \_/\_/  |__|__||_____||__|\_|    |__|    \__,_||__|__|\____| |__|  |____|\___/ |__|__| \___|
                                                                                                      
     */
-
-    /**
-     * @dev Sets the ERC721 token address
-     * @param _mooseAddress The NFT address
-     */
-
-    function setMooseAddress(address _mooseAddress) public onlyOwner {
-        mooseAddress = _mooseAddress;
-    }
 
     /**
      * @dev Sets the ERC20 token address

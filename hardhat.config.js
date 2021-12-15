@@ -20,6 +20,11 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 module.exports = {
   networks: {
+    hardhat: {
+      forking: {
+        url: "https://eth-mainnet.alchemyapi.io/v2/" + process.env.ALCHEMY_KEY,
+      }
+    },
     metis_test: {
       url: "https://stardust.metis.io/?owner=588",
       accounts:

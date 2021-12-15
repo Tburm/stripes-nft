@@ -39,9 +39,8 @@ contract MetisNFT is ERC721Enumerable, Ownable {
     address public libraryAddress;
     address _owner;
 
-    constructor(address _traxAddress, address _libraryAddress) ERC721("Frame", "FRAME") {
+    constructor(address _libraryAddress) ERC721("Frame", "FRAME") {
         _owner = msg.sender;
-        setTraxAddress(_traxAddress);
         setLibraryAddress(_libraryAddress);
 
         // test mint
@@ -117,7 +116,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
         require(msg.value >= getMintPriceEth(), "Not enough ETH");
 
         uint256 tokenId = mintInternal();
-        setTokenConfig(tokenId, tokenConfig);
     }
 
     /**
@@ -130,7 +128,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
 
         IToken(traxAddress).burnFrom(msg.sender, getMintPriceTrax());
         uint256 tokenId = mintInternal();
-        setTokenConfig(tokenId, tokenConfig);
     }
 
     /**
@@ -164,33 +161,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
     }
 
     /**
-     * @dev Sets the config for a token
-     */
-    function setTokenConfig(uint256 _tokenId, string memory _newConfig) public {
-        require(keccak256(abi.encodePacked(tokenIdToConfig[_tokenId])) !=
-            keccak256(abi.encodePacked(_newConfig)), "Config must be different");
-
-        uint256 allowance = IToken(traxAddress).allowance(msg.sender, address(this));
-        (uint256 price, uint256 valueDiff, bool valueIncreased) = getCustomizationPrice(_tokenId, _newConfig);
-        uint256 balance = IToken(traxAddress).balanceOf(msg.sender);
-        require(allowance >= price, "Check the token allowance");
-        require(balance >= price, "You need more TRAX");
-
-        if(valueDiff >= 0 && valueIncreased) {
-            IToken(traxAddress).transferFrom(
-                msg.sender,
-                address(this),
-                valueDiff
-            );
-            IToken(traxAddress).burnFrom(msg.sender, price.sub(valueDiff));
-            tokenIdToStoredTrax[_tokenId] += valueDiff;
-        } else if(valueDiff >= 0 && !valueIncreased) {
-            tokenIdToStoredTrax[_tokenId] -= valueDiff;
-        }
-        tokenIdToConfig[_tokenId] = _newConfig;
-    }
-
-    /**
      * @dev Takes an array of trait changes and gets the new config
      */
     function getNewTokenConfig(uint256 _tokenId, uint8[2][] calldata _newTraits)
@@ -206,78 +176,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
             newTokenConfig = Library.stringReplace(newTokenConfig, _newTraits[i][0], newTraitValue);
         }
         return (newTokenConfig);
-    }
-
-    /**
-     * @dev Gets the price of a newly minted frame
-     */
-    function getMintCustomizationPrice(string memory _newConfig)
-        public
-        view
-        returns (uint256 price)
-    {
-        price = 0;
-        for (uint8 i = 0; i < 9; i++) {
-            uint8 traitValue = convertInt(bytes(_newConfig).slice(i, 1).toUint8(0));
-            uint256 traitPrice = TraitLibrary(libraryAddress).getPrice(i, traitValue);
-            price = price.add(traitPrice);
-        }
-
-        price = price.mul(10**16);
-        return price;
-    }
-
-    /**
-     * @dev Gets the price given a tokenId and new config
-     */
-    function getCustomizationPrice(uint256 _tokenId, string memory _newConfig)
-        public
-        view
-        returns (uint256 price, uint256 valueDiff, bool increased)
-    {
-        string memory tokenConfig = tokenIdToConfig[_tokenId];
-        uint256 currentValue = tokenIdToStoredTrax[_tokenId];
-        
-        price = 0;
-        uint256 futureValue = 0;
-        for (uint8 i = 0; i < 9; i++) {
-            uint8 traitValue = convertInt(bytes(_newConfig).slice(i, 1).toUint8(0));
-            uint256 traitPrice = TraitLibrary(libraryAddress).getPrice(i, traitValue);
-            bool isChanged = keccak256(abi.encodePacked(bytes(tokenConfig).slice(i, 1))) !=
-                keccak256(abi.encodePacked(bytes(_newConfig).slice(i, 1)));
-
-            futureValue = futureValue.add(traitPrice);
-            if(isChanged) {
-                price = price.add(traitPrice);
-            }
-        }
-
-        price = price.mul(10**16);
-        futureValue = futureValue.mul(10**16).div(100).mul(80);
-        if(futureValue == currentValue) {
-            valueDiff = 0;
-            increased = true;
-        } else if(futureValue > currentValue) {
-            valueDiff = futureValue.sub(currentValue);
-            increased = true;
-        } else {
-            valueDiff = currentValue.sub(futureValue);
-            increased = false;
-        }
-
-        return (price, valueDiff, increased);
-    }
-
-    /**
-     * @dev Gets the price of a specified trait
-     */
-    function getTraitPrice(uint256 typeIndex, uint256 nameIndex)
-        public
-        view
-        returns (uint256 traitPrice)
-    {
-        traitPrice = TraitLibrary(libraryAddress).getPrice(typeIndex, nameIndex);
-        return traitPrice;
     }
 
     /**

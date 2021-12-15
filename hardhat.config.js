@@ -29,6 +29,11 @@ module.exports = {
       url: "https://stardust.metis.io/?owner=588",
       accounts:
         process.env.PRIVATE_KEY_METIS !== undefined ? [process.env.PRIVATE_KEY_METIS] : [],
+    },
+    metis: {
+      url: "https://andromeda.metis.io/?owner=1088",
+      accounts:
+        process.env.PRIVATE_KEY_METIS !== undefined ? [process.env.PRIVATE_KEY_METIS] : [],
     }
   },
   solidity: {

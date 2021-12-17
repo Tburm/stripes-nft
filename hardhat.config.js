@@ -1,6 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require('@openzeppelin/hardhat-upgrades');
 require("@nomiclabs/hardhat-solhint");
+require('hardhat-abi-exporter');
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -36,6 +37,7 @@ module.exports = {
         process.env.PRIVATE_KEY_METIS !== undefined ? [process.env.PRIVATE_KEY_METIS] : [],
     }
   },
+  
   solidity: {
     version: "0.8.4",
     settings: {
@@ -44,5 +46,13 @@ module.exports = {
         runs: 200,
       },
     }
+  },
+
+  abiExporter: {
+    path: './data/abi',
+    clear: true,
+    flat: true,
+    spacing: 2,
+    pretty: true,
   }
 };

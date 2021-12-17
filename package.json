@@ -13,6 +13,8 @@
     "ethers": "^5.5.2"
   },
   "scripts": {
-    "hardhat": "npx hardhat node"
+    "hardhat": "npx hardhat node",
+    "deploy_test": "npx hardhat run --network metis_test scripts/deploy_nft.js",
+    "deploy": "npx hardhat run --network metis scripts/deploy_nft.js"
   }
 }

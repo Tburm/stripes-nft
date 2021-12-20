@@ -5,46 +5,32 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./IToken.sol";
-import "./Library.sol";
 import "./TraitLibrary.sol";
+import "./Library.sol";
 import "./BytesLib.sol";
 
+// remove for deploy
+import "hardhat/console.sol";
+
 contract MetisNFT is ERC721Enumerable, Ownable {
-    using BytesLib for bytes;
-    using SafeMath for uint256;
     using Library for uint8;
+    using BytesLib for bytes;
+    using BytesLib for bytes1;
+    using SafeMath for uint256;
+
+    // addresses
+    address _owner;
+    address libraryAddress;
+
+    // integers
+    uint256 SEED_NONCE = 0;
 
     //Mappings
-    mapping(uint256 => string) internal tokenIdToConfig;
-    mapping(uint256 => uint256) internal tokenIdToStoredTrax;
+    mapping(uint256 => bytes) internal tokenIdToConfig;
 
-    //uint256s
-    uint256 MAX_SUPPLY = 10000;
-    uint256 MINTS_PER_TIER = 1000;
-
-    uint256 MINT_START = 1639418400;
-    uint256 MINT_START_ETH = MINT_START.add(86400);
-
-    uint256 MINT_DELAY = 43200;
-    uint256 START_PRICE = 70000000000000000;
-    uint256 MIN_PRICE = 20000000000000000;
-    uint256 PRICE_DIFF = 5000000000000000;
-
-    uint256 START_PRICE_TRAX = 10000000000000000000;
-    uint256 PRICE_DIFF_TRAX = 10000000000000000000;
-
-    //address
-    address public traxAddress;
-    address public libraryAddress;
-    address _owner;
-
-    constructor(address _libraryAddress) ERC721("Frame", "FRAME") {
+    constructor(address _libraryAddress) ERC721("Stripes", "STRIPES") {
         _owner = msg.sender;
-        setLibraryAddress(_libraryAddress);
-
-        // test mint
-        mintInternal();
+        libraryAddress = _libraryAddress;
     }
 
     /*
@@ -56,289 +42,209 @@ contract MetisNFT is ERC721Enumerable, Ownable {
    */
 
     /**
-     * @dev Generates an 8 digit config
+     * @dev Generate a pseudorandom byte
+     * @param _t The token id to be used for randomness
+     * @param _a The address to be used for randomness
+     * @param _c The custom nonce to be used within the hash.
+     * @param _range The range of the number to generate
      */
-    function config() internal pure returns (string memory) {
-        // This will generate an 9 character string.
-        // All of them will start as 0
-        string memory currentConfig = "000000000";
-        return currentConfig;
+    function randomGen(
+        uint256 _t,
+        address _a,
+        uint256 _c,
+        uint8 _range
+    ) internal view returns (uint8)
+    {
+        uint8 _randomVal = uint8(
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.timestamp,
+                        block.difficulty,
+                        _t,
+                        _a,
+                        _c
+                    )
+                )
+            ) % _range
+        );
+        return _randomVal;
+    }
+
+    /**
+     * @dev Generates a random config for this image
+     * @param _t The token id to be used within the hash.
+     * @param _a The address to be used within the hash.
+     */
+    function config(
+        uint256 _t,
+        address _a
+    ) internal returns (bytes memory) {
+        bytes memory completeConfig;
+        uint256 _c = SEED_NONCE;
+        for(uint256 i = 0; i < 10; i++) {
+            // get the width
+            uint8 _width = randomGen(_t, _a, _c+i, 32);
+
+            // get the height
+            uint8 _height = randomGen(_t, _a, _c+i*1, 32);
+
+            // get the colors
+            uint8 _colorR = randomGen(_t, _a, _c+i*2, 255);
+            uint8 _colorG = randomGen(_t, _a, _c+i*3, 255);
+            uint8 _colorB = randomGen(_t, _a, _c+i*4, 255);
+
+            // get the speed
+            uint8 _speed = randomGen(_t, _a, _c+i*5, 10);
+
+            completeConfig = abi.encodePacked(
+                completeConfig,
+                _width,
+                _height,
+                _colorR,
+                _colorG,
+                _colorB,
+                _speed
+            );
+        }
+        SEED_NONCE += 6*5;
+        console.logBytes(completeConfig);
+        return completeConfig;
     }
 
     /**
      * @dev Mint internal, this is to avoid code duplication.
      */
-    function mintInternal() internal returns (uint256 tokenId) {
-        uint256 _totalSupply = totalSupply();
-        require(_totalSupply < MAX_SUPPLY);
-        require(!Library.isContract(msg.sender));
+    function mintInternal() internal {
+        uint256 thisTokenId = totalSupply();
 
-        uint256 thisTokenId = _totalSupply;
-
-        tokenIdToConfig[thisTokenId] = config();
-        tokenIdToStoredTrax[thisTokenId] = 0;
-        _mint(msg.sender, thisTokenId);
-        return thisTokenId;
+        tokenIdToConfig[thisTokenId] = config(thisTokenId, msg.sender);
+        _safeMint(msg.sender, thisTokenId);
     }
 
     /**
-     * @dev Mints new frame using TRAX
+     * @dev Mint internal, this is to avoid code duplication.
      */
-    function mintFrameWithTrax(uint8 _times) public {
-        require(block.timestamp >= MINT_START, "Minting has not started");
-        uint256 allowance = IToken(traxAddress).allowance(msg.sender, address(this));
-        require(allowance >= _times * getMintPriceTrax(), "Check the token allowance");
+    function mint() public {
+        mintInternal();
+    }
 
-        IToken(traxAddress).burnFrom(msg.sender, _times * getMintPriceTrax());
-        for(uint256 i=0; i< _times; i++){
-            mintInternal();
+    function toByte(uint8 _num) public pure returns (bytes1 _ret) {
+        assembly {
+            mstore8(0x20, _num)
+            _ret := mload(0x20)
         }
     }
 
-    /**
-     * @dev Mints new frame using ETH
-     */
-    function mintFrameWithEth(uint8 _times) public payable {
-        require(block.timestamp >= MINT_START_ETH, "Minting for ETH has not started");
-        require((_times > 0 && _times <= 20));
-        require(msg.value >= _times * getMintPriceEth());
+    // /**
+    //  * @dev Mint internal, this is to avoid code duplication.
+    //  */
+    // function testBytes() public {
+    //     uint8 testVal1 = 1;
+    //     bytes1 newTestVal1 = toByte(testVal1);
+    //     uint8 newNewTestVal1 = abi.encodePacked(newTestVal1).toUint8(0);
 
-        for(uint256 i=0; i< _times; i++){
-            mintInternal();
-        }
-    }
+    //     console.log(testVal1);
+    //     console.logBytes1(newTestVal1);
+    //     console.log(newNewTestVal1);
+    // }
 
-    /**
-     * @dev Mints new frame with customizations using ETH
-     */
-    function mintCustomooseWithEth(string memory tokenConfig) public payable {
-        require(block.timestamp >= MINT_START_ETH, "Minting for ETH has not started");
-        require(msg.value >= getMintPriceEth(), "Not enough ETH");
+    // /**
+    //  * @dev Mint internal, this is to avoid code duplication.
+    //  */
+    // function testBytes() public view {
+    //     bytes memory testVal = TraitLibrary(libraryAddress).getRects(0, 1);
+    //     for(uint256 i = 0; i < testVal.length; i++) {
+    //         uint8 intVal = testVal.slice(i, 1).toUint8(0);
+    //         console.log(intVal);
+    //     }
+    // }
 
-        uint256 tokenId = mintInternal();
-    }
-
-    /**
-     * @dev Mints new frame with customizations using TRAX
-     */
-    function mintCustomooseWithTrax(string memory tokenConfig) public payable {
-        require(block.timestamp >= MINT_START, "Minting has not started");
-        uint256 allowance = IToken(traxAddress).allowance(msg.sender, address(this));
-        require(allowance >= getMintPriceTrax(), "Check the token allowance");
-
-        IToken(traxAddress).burnFrom(msg.sender, getMintPriceTrax());
-        uint256 tokenId = mintInternal();
-    }
-
-    /**
-     * @dev Burns a frame and returns TRAX
-     */
-    function burnFrameForTrax(uint256 _tokenId) public {
-        require(ownerOf(_tokenId) == msg.sender);
-
-        //Burn token
-        _transfer(
-            msg.sender,
-            0x000000000000000000000000000000000000dEaD,
-            _tokenId
-        );
-
-        //Return the TRAX
-        IToken(traxAddress).transfer(
-            msg.sender,
-            tokenIdToStoredTrax[_tokenId]
-        );
-    }
-
-    /**
-     * @dev Sets a trait for a token
-     */
-    function setTokenTrait(uint256 _tokenId, uint8 _traitIndex, uint8 _traitValue) public onlyOwner {
-        string memory tokenConfig = tokenIdToConfig[_tokenId];
-        string memory newTokenConfig = Library.stringReplace(tokenConfig, _traitIndex, Library.toString(_traitValue));
-
-        tokenIdToConfig[_tokenId] = newTokenConfig;
-    }
-
-    /**
-     * @dev Takes an array of trait changes and gets the new config
-     */
-    function getNewTokenConfig(uint256 _tokenId, uint8[2][] calldata _newTraits)
-        public
-        view
-        returns (string memory)
-    {
-        string memory tokenConfig = tokenIdToConfig[_tokenId];
-        
-        string memory newTokenConfig = tokenConfig;
-        for (uint8 i = 0; i < _newTraits.length; i++) {
-            string memory newTraitValue = Library.toString(_newTraits[i][1]);
-            newTokenConfig = Library.stringReplace(newTokenConfig, _newTraits[i][0], newTraitValue);
-        }
-        return (newTokenConfig);
-    }
-
-    /**
-     * @dev Gets the current mint price in ETH for a new frame
-     */
-    function getMintPriceEth()
-        public
-        view
-        returns (uint256 price)
-    {
-        if(block.timestamp < MINT_START_ETH) {
-            return START_PRICE;
-        }
-
-        uint256 _mintTiersComplete = block.timestamp.sub(MINT_START_ETH).div(MINT_DELAY);
-        if(PRICE_DIFF.mul(_mintTiersComplete) >= START_PRICE.sub(MIN_PRICE)) {
-            return MIN_PRICE;
-        } else {
-            return START_PRICE - (PRICE_DIFF * _mintTiersComplete);
-        }
-    }
-
-    /**
-     * @dev Gets the current mint price in TRAX for a new frame
-     */
-    function getMintPriceTrax()
-        public
-        view
-        returns (uint256 price)
-    {
-        uint256 _totalSupply = totalSupply();
-
-        if(_totalSupply == 0) return START_PRICE_TRAX;
-
-        uint256 _mintTiersComplete = _totalSupply.div(MINTS_PER_TIER);
-        price = START_PRICE_TRAX.add(_mintTiersComplete.mul(PRICE_DIFF_TRAX));
-        return price;
-    }
-
-    /*
- ____     ___   ____  ___        _____  __ __  ____     __ ______  ____  ___   ____   _____
-|    \   /  _] /    ||   \      |     ||  |  ||    \   /  ]      ||    |/   \ |    \ / ___/
-|  D  ) /  [_ |  o  ||    \     |   __||  |  ||  _  | /  /|      | |  ||     ||  _  (   \_ 
-|    / |    _]|     ||  D  |    |  |_  |  |  ||  |  |/  / |_|  |_| |  ||  O  ||  |  |\__  |
-|    \ |   [_ |  _  ||     |    |   _] |  :  ||  |  /   \_  |  |   |  ||     ||  |  |/  \ |
-|  .  \|     ||  |  ||     |    |  |   |     ||  |  \     | |  |   |  ||     ||  |  |\    |
-|__|\_||_____||__|__||_____|    |__|    \__,_||__|__|\____| |__|  |____|\___/ |__|__| \___|
+//     /*
+//  ____     ___   ____  ___        _____  __ __  ____     __ ______  ____  ___   ____   _____
+// |    \   /  _] /    ||   \      |     ||  |  ||    \   /  ]      ||    |/   \ |    \ / ___/
+// |  D  ) /  [_ |  o  ||    \     |   __||  |  ||  _  | /  /|      | |  ||     ||  _  (   \_ 
+// |    / |    _]|     ||  D  |    |  |_  |  |  ||  |  |/  / |_|  |_| |  ||  O  ||  |  |\__  |
+// |    \ |   [_ |  _  ||     |    |   _] |  :  ||  |  /   \_  |  |   |  ||     ||  |  |/  \ |
+// |  .  \|     ||  |  ||     |    |  |   |     ||  |  \     | |  |   |  ||     ||  |  |\    |
+// |__|\_||_____||__|__||_____|    |__|    \__,_||__|__|\____| |__|  |____|\___/ |__|__| \___|
                                                                                            
-*/
+// */
 
-    /**
-     * @dev Convert a raw assembly int value to a pixel location
-     */
-    function convertInt(uint8 _inputInt)
-        internal
-        pure
-        returns (uint8)
-    {
-        if (
-            (_inputInt >= 48) &&
-            (_inputInt <= 57)
-        ) {
-            _inputInt -= 48;
-            return _inputInt;
-        } else {
-            _inputInt -= 87;
-            return _inputInt;
+    // /**
+    //  * @dev Converts utf-8 encodings to pixel locations
+    //  */
+    // function convertInt(uint8 _inputInt)
+    //     internal
+    //     pure
+    //     returns (uint8)
+    // {
+    //     if (
+    //         (_inputInt >= 48) &&
+    //         (_inputInt <= 57)
+    //     ) {
+    //         _inputInt -= 48;
+    //         return _inputInt;
+    //     } else {
+    //         _inputInt -= 87;
+    //         return _inputInt;
 
-        }
-    }
+    //     }
+    // }
 
     /**
      * @dev Config to SVG function
      */
-    function configToSVG(string memory _config)
+    function configToSVG(bytes memory _config)
         public
         view
         returns (string memory)
     {
         string memory svgString;
 
-        for (uint8 i = 0; i < 9; i++) {
-            uint8 thisTraitIndex = convertInt(bytes(_config).slice(i, 1).toUint8(0));
-            bytes memory traitRects = TraitLibrary(libraryAddress).getRects(i, thisTraitIndex);
+        for (uint8 i = 0; i < 10; i++) {
+            bytes memory stripeConfig = _config.slice(i*6, 6);
 
-            if(bytes(traitRects).length == 0) continue;
-            bool isRow = traitRects.slice(0, 1).equal(bytes("r"));
+            string memory width = stripeConfig.slice(0, 1).toUint8(0).toString();
+            string memory y = stripeConfig.slice(1, 1).toUint8(0).toString();
+            string memory colorR = stripeConfig.slice(2, 1).toUint8(0).toString();
+            string memory colorG = stripeConfig.slice(3, 1).toUint8(0).toString();
+            string memory colorB = stripeConfig.slice(4, 1).toUint8(0).toString();
+            string memory speed = stripeConfig.slice(5, 1).toUint8(0).toString();
 
-            uint16 j = 1;
-            string memory thisColor = "";
-            bool newColor = true;
-            while(j < bytes(traitRects).length)
-            {
-                if(newColor) {
-                    // get the color
-                    thisColor = string(traitRects.slice(j, 3));
-                    j += 3;
-                    newColor = false;
-                    continue;
-                } else {
-                    // if pipe, new color
-                    if (
-                        traitRects.slice(j, 1).equal(bytes("|"))
-                    ) {
-                        newColor = true;
-                        j += 1;
-                        continue;
-                    } else {
-                        // else add rects
-                        bytes memory thisRect = traitRects.slice(j, 3);
-
-                        uint8 x = convertInt(thisRect.slice(0, 1).toUint8(0));
-                        uint8 y = convertInt(thisRect.slice(1, 1).toUint8(0));
-                        uint8 length = convertInt(thisRect.slice(2, 1).toUint8(0)) + 1;
-
-                        if(isRow) {
-                            svgString = string(
-                                abi.encodePacked(
-                                    svgString,
-                                    "<rect class='c",
-                                    thisColor,
-                                    "' x='",
-                                    x.toString(),
-                                    "' y='",
-                                    y.toString(),
-                                    "' width='",
-                                    length.toString(),
-                                    "px' height='1px'",
-                                    "/>"
-                                )
-                            );
-                            j += 3;
-                            continue;
-                        } else {
-                            svgString = string(
-                                abi.encodePacked(
-                                    svgString,
-                                    "<rect class='c",
-                                    thisColor,
-                                    "' x='",
-                                    x.toString(),
-                                    "' y='",
-                                    y.toString(),
-                                    "' height='",
-                                    length.toString(),
-                                    "px' width='1px'",
-                                    "/>"
-                                )
-                            );
-                            j += 3;
-                            continue;
-                        }
-                    }
-                }
-            }
+            svgString = string(
+                abi.encodePacked(
+                    svgString,
+                    "<rect class='stripe_",
+                    i.toString(),
+                    "' x='",
+                    "1",
+                    "' y='",
+                    y,
+                    "' width='",
+                    width,
+                    "px' height='1px'",
+                    " style='fill: rgb(",
+                    colorR,",",colorG,",",colorB,
+                    ")'>"
+                )
+            );
+            svgString = string(
+                abi.encodePacked(
+                    svgString,
+                    "<animate attributeName='x' from='-32' to='32' dur='",
+                    speed,
+                    "s' repeatCount='indefinite' />"
+                    "</rect>"
+                )
+            );
         }
 
         svgString = string(
             abi.encodePacked(
-                '<svg id="moose-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 32 32">',
+                '<svg id="svg-frame" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 32 32">',
                 svgString,
-                "<style>rect.bg{width:32px;height:32px;} #moose-svg{shape-rendering: crispedges;}",
-                TraitLibrary(libraryAddress).getColors(),
+                "<style>#svg-frame{shape-rendering: crispedges;}",
                 "</style></svg>"
             )
         );
@@ -346,76 +252,76 @@ contract MetisNFT is ERC721Enumerable, Ownable {
         return svgString;
     }
 
-    /**
-     * @dev Config to metadata function
-     */
-    function configToMetadata(string memory _config)
-        public
-        view
-        returns (string memory)
-    {
-        string memory metadataString;
+    // /**
+    //  * @dev Config to metadata function
+    //  */
+    // function configToMetadata(string memory _config)
+    //     public
+    //     view
+    //     returns (string memory)
+    // {
+    //     string memory metadataString;
 
-        for (uint8 i = 0; i < 9; i++) {
-            uint8 thisTraitIndex = convertInt(bytes(_config).slice(i, 1).toUint8(0));
+    //     for (uint8 i = 0; i < 9; i++) {
+    //         uint8 thisTraitIndex = convertInt(bytes(_config).slice(i, 1).toUint8(0));
 
-            (string memory traitName, string memory traitType) = TraitLibrary(libraryAddress).getTraitInfo(i, thisTraitIndex);
-            metadataString = string(
-                abi.encodePacked(
-                    metadataString,
-                    '{"trait_type":"',
-                    traitType,
-                    '","value":"',
-                    traitName,
-                    '"}'
-                )
-            );
+    //         (string memory traitName, string memory traitType) = TraitLibrary(libraryAddress).getTraitInfo(i, thisTraitIndex);
+    //         metadataString = string(
+    //             abi.encodePacked(
+    //                 metadataString,
+    //                 '{"trait_type":"',
+    //                 traitType,
+    //                 '","value":"',
+    //                 traitName,
+    //                 '"}'
+    //             )
+    //         );
 
-            if (i != 8)
-                metadataString = string(abi.encodePacked(metadataString, ","));
-        }
+    //         if (i != 8)
+    //             metadataString = string(abi.encodePacked(metadataString, ","));
+    //     }
 
-        return string(abi.encodePacked("[", metadataString, "]"));
-    }
+    //     return string(abi.encodePacked("[", metadataString, "]"));
+    // }
 
-    /**
-     * @dev Returns the SVG and metadata for a token Id
-     * @param _tokenId The tokenId to return the SVG and metadata for.
-     */
-    function tokenURI(uint256 _tokenId)
-        public
-        view
-        override
-        returns (string memory)
-    {
-        require(_exists(_tokenId));
+    // /**
+    //  * @dev Returns the SVG and metadata for a token Id
+    //  * @param _tokenId The tokenId to return the SVG and metadata for.
+    //  */
+    // function tokenURI(uint256 _tokenId)
+    //     public
+    //     view
+    //     override
+    //     returns (string memory)
+    // {
+    //     require(_exists(_tokenId));
 
-        string memory tokenConfig = _tokenIdToConfig(_tokenId);
+    //     string memory tokenConfig = _tokenIdToConfig(_tokenId);
 
-        return
-            string(
-                abi.encodePacked(
-                    "data:application/json;base64,",
-                    Library.encode(
-                        bytes(
-                            string(
-                                abi.encodePacked(
-                                    '{"name": "FRAME Edition 0, Token #',
-                                    Library.toString(_tokenId),
-                                    '", "description": "FRAME tokens are fully customizable on-chain pixel art. Edition 0 is a collection of 32x32 Moose avatars.", "image": "data:image/svg+xml;base64,',
-                                    Library.encode(
-                                        bytes(configToSVG(tokenConfig))
-                                    ),
-                                    '","attributes":',
-                                    configToMetadata(tokenConfig),
-                                    "}"
-                                )
-                            )
-                        )
-                    )
-                )
-            );
-    }
+    //     return
+    //         string(
+    //             abi.encodePacked(
+    //                 "data:application/json;base64,",
+    //                 Library.encode(
+    //                     bytes(
+    //                         string(
+    //                             abi.encodePacked(
+    //                                 '{"name": "FRAME Edition 0, Token #',
+    //                                 Library.toString(_tokenId),
+    //                                 '", "description": "FRAME tokens are fully customizable on-chain pixel art. Edition 0 is a collection of 32x32 Moose avatars.", "image": "data:image/svg+xml;base64,',
+    //                                 Library.encode(
+    //                                     bytes(configToSVG(tokenConfig))
+    //                                 ),
+    //                                 '","attributes":',
+    //                                 configToMetadata(tokenConfig),
+    //                                 "}"
+    //                             )
+    //                         )
+    //                     )
+    //                 )
+    //             )
+    //         );
+    // }
 
     /**
      * @dev Returns a config for a given tokenId
@@ -424,23 +330,10 @@ contract MetisNFT is ERC721Enumerable, Ownable {
     function _tokenIdToConfig(uint256 _tokenId)
         public
         view
-        returns (string memory)
+        returns (bytes memory)
     {
-        string memory tokenConfig = tokenIdToConfig[_tokenId];
+        bytes memory tokenConfig = tokenIdToConfig[_tokenId];
         return tokenConfig;
-    }
-
-    /**
-     * @dev Returns the current amount of TRAX stored for a given tokenId
-     * @param _tokenId The tokenId to look up.
-     */
-    function _tokenIdToStoredTrax(uint256 _tokenId)
-        public
-        view
-        returns (uint256)
-    {
-        uint256 storedTrax = tokenIdToStoredTrax[_tokenId];
-        return storedTrax;
     }
 
     /**
@@ -461,25 +354,25 @@ contract MetisNFT is ERC721Enumerable, Ownable {
         return tokensId;
     }
 
-    /*
-  ___   __    __  ____     ___  ____       _____  __ __  ____     __ ______  ____  ___   ____   _____
- /   \ |  |__|  ||    \   /  _]|    \     |     ||  |  ||    \   /  ]      ||    |/   \ |    \ / ___/
-|     ||  |  |  ||  _  | /  [_ |  D  )    |   __||  |  ||  _  | /  /|      | |  ||     ||  _  (   \_ 
-|  O  ||  |  |  ||  |  ||    _]|    /     |  |_  |  |  ||  |  |/  / |_|  |_| |  ||  O  ||  |  |\__  |
-|     ||  `  '  ||  |  ||   [_ |    \     |   _] |  :  ||  |  /   \_  |  |   |  ||     ||  |  |/  \ |
-|     | \      / |  |  ||     ||  .  \    |  |   |     ||  |  \     | |  |   |  ||     ||  |  |\    |
- \___/   \_/\_/  |__|__||_____||__|\_|    |__|    \__,_||__|__|\____| |__|  |____|\___/ |__|__| \___|
+//     /*
+//   ___   __    __  ____     ___  ____       _____  __ __  ____     __ ______  ____  ___   ____   _____
+//  /   \ |  |__|  ||    \   /  _]|    \     |     ||  |  ||    \   /  ]      ||    |/   \ |    \ / ___/
+// |     ||  |  |  ||  _  | /  [_ |  D  )    |   __||  |  ||  _  | /  /|      | |  ||     ||  _  (   \_ 
+// |  O  ||  |  |  ||  |  ||    _]|    /     |  |_  |  |  ||  |  |/  / |_|  |_| |  ||  O  ||  |  |\__  |
+// |     ||  `  '  ||  |  ||   [_ |    \     |   _] |  :  ||  |  /   \_  |  |   |  ||     ||  |  |/  \ |
+// |     | \      / |  |  ||     ||  .  \    |  |   |     ||  |  \     | |  |   |  ||     ||  |  |\    |
+//  \___/   \_/\_/  |__|__||_____||__|\_|    |__|    \__,_||__|__|\____| |__|  |____|\___/ |__|__| \___|
                                                                                                      
-    */
+//     */
 
-    /**
-     * @dev Sets the ERC20 token address
-     * @param _traxAddress The token address
-     */
+//     /**
+//      * @dev Sets the ERC20 token address
+//      * @param _traxAddress The token address
+//      */
 
-    function setTraxAddress(address _traxAddress) public onlyOwner {
-        traxAddress = _traxAddress;
-    }
+//     function setTraxAddress(address _traxAddress) public onlyOwner {
+//         traxAddress = _traxAddress;
+//     }
 
    /**
      * @dev Sets the trait library address
@@ -488,14 +381,5 @@ contract MetisNFT is ERC721Enumerable, Ownable {
 
     function setLibraryAddress(address _libraryAddress) public onlyOwner {
         libraryAddress = _libraryAddress;
-    }
-
-    /**
-     * @dev Withdraw ETH to owner
-     */
-    function withdraw() public onlyOwner {
-        uint256 balance = address(this).balance;
-
-        payable(msg.sender).transfer(balance);
     }
 }

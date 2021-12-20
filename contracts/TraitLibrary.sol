@@ -17,6 +17,9 @@ contract TraitLibrary is Ownable {
     //addresses
     address _owner;
 
+    //uint arrays
+    uint32[][9] PRICES;
+
     //byte arrays
     bytes[9] TYPES;
     bytes[][9] NAMES;
@@ -38,6 +41,16 @@ contract TraitLibrary is Ownable {
                 bytes("nose"),
                 bytes("accessory")
         ];
+
+        PRICES[0] = [0];
+        PRICES[1] = [0];
+        PRICES[2] = [0];
+        PRICES[3] = [0];
+        PRICES[4] = [0];
+        PRICES[5] = [0];
+        PRICES[6] = [0];
+        PRICES[7] = [0];
+        PRICES[8] = [0];
 
         NAMES[0] = [
                 bytes("")
@@ -156,6 +169,20 @@ contract TraitLibrary is Ownable {
     }
 
     /**
+     * @dev Gets the price of a trait from storage
+     * @param traitIndex The trait type index
+     * @param traitValue The location within the array
+     */
+
+    function getPrice(uint256 traitIndex, uint256 traitValue)
+        public
+        view
+        returns (uint32 price)
+    {
+        return PRICES[traitIndex][traitValue];
+    }
+
+    /**
      * @dev Adds entries to trait metadata
      * @param _traitTypeIndex The trait type index
      * @param traits Array of traits to add
@@ -166,6 +193,7 @@ contract TraitLibrary is Ownable {
         onlyOwner
     {
         for (uint256 i = 0; i < traits.length; i++) {
+            PRICES[_traitTypeIndex].push(traits[i].price);
             NAMES[_traitTypeIndex].push(bytes(abi.encodePacked(traits[i].traitName)));
             RECTS[_traitTypeIndex].push(bytes(abi.encodePacked(traits[i].rects)));
         }
@@ -182,6 +210,7 @@ contract TraitLibrary is Ownable {
         public
         onlyOwner
     {
+        PRICES[_traitTypeIndex] = [0];
         NAMES[_traitTypeIndex] = [bytes("")];
         RECTS[_traitTypeIndex] = [bytes("")];
         return;

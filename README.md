@@ -4,12 +4,12 @@ This repo contains all of the contracts deployed for [Stripes](https://stripes.t
 
 Stripes is a 100% on-chain generative art project. The metadata for each STRIPE token is generated when the NFT is minted and stored on-chain. These smart contract decode the on-chain data to draw the image on an SVG canvas. These NFTs do not rely on IPFS or APIs to retrieve the image off-chain.
 
-## Stripes ([$STRIPE](https://stardust-explorer.metis.io/address/0x36c27551BED3E1dB018FC93807378e312d3Bb397/transactions))
+## Stripes ([$STRIPES](https://stardust-explorer.metis.io/address/0x36c27551BED3E1dB018FC93807378e312d3Bb397/transactions))
 
 Stripes is a collection of 10,000 pieces of on-chain generative art. 
 
 Contracts:
-* [StripesNFT.sol](./contracts/Moose.sol): An ERC721 contract that generated pseudo-random attributes and produces an SVG canvas from data stored on-chain
+* [StripesNFT.sol](./contracts/StripesNFT.sol): An ERC721 contract that generated pseudo-random attributes and produces an SVG canvas from data stored on-chain
 * [BytesLib.sol](./contracts/BytesLib.sol): A gas-efficient library of byte array utils ([source](https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol))
 * [Library.sol](./contracts/Library.sol): Function library for base64 encoding and other useful function
 

@@ -2,12 +2,12 @@ const hre = require("hardhat");
 
 async function main() {
   // get the contract to deploy
-  const Multicall = await hre.ethers.getContractFactory("Multicall");
+  const StripesNFT = await hre.ethers.getContractFactory("StripesNFT");
 
-  // then deploy the contract
-  const multicall = await Multicall.deploy();
+  // deploy the nft
+  const stripesNFT = await StripesNFT.deploy();
 
-  console.log("Multicall deployed to:", multicall.address);
+  console.log("StripesNFT deployed to:", stripesNFT.address);
 }
 
 main()

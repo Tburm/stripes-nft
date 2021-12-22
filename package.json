@@ -16,7 +16,7 @@
   },
   "scripts": {
     "hardhat": "npx hardhat node",
-    "deploy_test": "npx hardhat run --network metis_test scripts/deploy_nft.js",
-    "deploy": "npx hardhat run --network metis scripts/deploy_nft.js"
+    "deploy_test": "npx hardhat run --network metis_test scripts/deploy_stripes.js",
+    "deploy": "npx hardhat run --network metis scripts/deploy_stripes.js"
   }
 }

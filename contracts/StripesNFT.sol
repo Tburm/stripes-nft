@@ -1,18 +1,14 @@
-// contracts/CustoMoose.sol
+// contracts/StripesNFT.sol
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./TraitLibrary.sol";
 import "./Library.sol";
 import "./BytesLib.sol";
 
-// remove for deploy
-import "hardhat/console.sol";
-
-contract MetisNFT is ERC721Enumerable, Ownable {
+contract StripesNFT is ERC721Enumerable, Ownable {
     using Library for uint8;
     using BytesLib for bytes;
     using BytesLib for bytes1;
@@ -20,7 +16,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
 
     // addresses
     address _owner;
-    address libraryAddress;
 
     // integers
     uint256 SEED_NONCE = 0;
@@ -28,9 +23,8 @@ contract MetisNFT is ERC721Enumerable, Ownable {
     //Mappings
     mapping(uint256 => bytes) internal tokenIdToConfig;
 
-    constructor(address _libraryAddress) ERC721("Stripes", "STRIPES") {
+    constructor() ERC721("Stripes", "STRIPES") {
         _owner = msg.sender;
-        libraryAddress = _libraryAddress;
     }
 
     /*
@@ -87,15 +81,15 @@ contract MetisNFT is ERC721Enumerable, Ownable {
             uint8 _width = randomGen(_t, _a, _c+i, 32);
 
             // get the height
-            uint8 _height = randomGen(_t, _a, _c+i*1, 32);
+            uint8 _height = randomGen(_t, _a, _c+i*2, 32);
 
             // get the colors
-            uint8 _colorR = randomGen(_t, _a, _c+i*2, 255);
-            uint8 _colorG = randomGen(_t, _a, _c+i*3, 255);
-            uint8 _colorB = randomGen(_t, _a, _c+i*4, 255);
+            uint8 _colorR = randomGen(_t, _a, _c+i*3, 255);
+            uint8 _colorG = randomGen(_t, _a, _c+i*4, 255);
+            uint8 _colorB = randomGen(_t, _a, _c+i*5, 255);
 
             // get the speed
-            uint8 _speed = randomGen(_t, _a, _c+i*5, 10);
+            uint8 _speed = randomGen(_t, _a, _c+i*6, 10);
 
             completeConfig = abi.encodePacked(
                 completeConfig,
@@ -107,8 +101,7 @@ contract MetisNFT is ERC721Enumerable, Ownable {
                 _speed
             );
         }
-        SEED_NONCE += 6*5;
-        console.logBytes(completeConfig);
+        SEED_NONCE += 6*6;
         return completeConfig;
     }
 
@@ -136,30 +129,6 @@ contract MetisNFT is ERC721Enumerable, Ownable {
         }
     }
 
-    // /**
-    //  * @dev Mint internal, this is to avoid code duplication.
-    //  */
-    // function testBytes() public {
-    //     uint8 testVal1 = 1;
-    //     bytes1 newTestVal1 = toByte(testVal1);
-    //     uint8 newNewTestVal1 = abi.encodePacked(newTestVal1).toUint8(0);
-
-    //     console.log(testVal1);
-    //     console.logBytes1(newTestVal1);
-    //     console.log(newNewTestVal1);
-    // }
-
-    // /**
-    //  * @dev Mint internal, this is to avoid code duplication.
-    //  */
-    // function testBytes() public view {
-    //     bytes memory testVal = TraitLibrary(libraryAddress).getRects(0, 1);
-    //     for(uint256 i = 0; i < testVal.length; i++) {
-    //         uint8 intVal = testVal.slice(i, 1).toUint8(0);
-    //         console.log(intVal);
-    //     }
-    // }
-
 //     /*
 //  ____     ___   ____  ___        _____  __ __  ____     __ ______  ____  ___   ____   _____
 // |    \   /  _] /    ||   \      |     ||  |  ||    \   /  ]      ||    |/   \ |    \ / ___/
@@ -171,33 +140,12 @@ contract MetisNFT is ERC721Enumerable, Ownable {
                                                                                            
 // */
 
-    // /**
-    //  * @dev Converts utf-8 encodings to pixel locations
-    //  */
-    // function convertInt(uint8 _inputInt)
-    //     internal
-    //     pure
-    //     returns (uint8)
-    // {
-    //     if (
-    //         (_inputInt >= 48) &&
-    //         (_inputInt <= 57)
-    //     ) {
-    //         _inputInt -= 48;
-    //         return _inputInt;
-    //     } else {
-    //         _inputInt -= 87;
-    //         return _inputInt;
-
-    //     }
-    // }
-
     /**
      * @dev Config to SVG function
      */
     function configToSVG(bytes memory _config)
         public
-        view
+        pure
         returns (string memory)
     {
         string memory svgString;
@@ -252,76 +200,44 @@ contract MetisNFT is ERC721Enumerable, Ownable {
         return svgString;
     }
 
-    // /**
-    //  * @dev Config to metadata function
-    //  */
-    // function configToMetadata(string memory _config)
-    //     public
-    //     view
-    //     returns (string memory)
-    // {
-    //     string memory metadataString;
+    /**
+     * @dev Returns the SVG and metadata for a token Id
+     * @param _tokenId The tokenId to return the SVG and metadata for.
+     */
+    function tokenURI(uint256 _tokenId)
+        public
+        view
+        override
+        returns (string memory)
+    {
+        require(_exists(_tokenId));
 
-    //     for (uint8 i = 0; i < 9; i++) {
-    //         uint8 thisTraitIndex = convertInt(bytes(_config).slice(i, 1).toUint8(0));
+        bytes memory tokenConfig = _tokenIdToConfig(_tokenId);
 
-    //         (string memory traitName, string memory traitType) = TraitLibrary(libraryAddress).getTraitInfo(i, thisTraitIndex);
-    //         metadataString = string(
-    //             abi.encodePacked(
-    //                 metadataString,
-    //                 '{"trait_type":"',
-    //                 traitType,
-    //                 '","value":"',
-    //                 traitName,
-    //                 '"}'
-    //             )
-    //         );
-
-    //         if (i != 8)
-    //             metadataString = string(abi.encodePacked(metadataString, ","));
-    //     }
-
-    //     return string(abi.encodePacked("[", metadataString, "]"));
-    // }
-
-    // /**
-    //  * @dev Returns the SVG and metadata for a token Id
-    //  * @param _tokenId The tokenId to return the SVG and metadata for.
-    //  */
-    // function tokenURI(uint256 _tokenId)
-    //     public
-    //     view
-    //     override
-    //     returns (string memory)
-    // {
-    //     require(_exists(_tokenId));
-
-    //     string memory tokenConfig = _tokenIdToConfig(_tokenId);
-
-    //     return
-    //         string(
-    //             abi.encodePacked(
-    //                 "data:application/json;base64,",
-    //                 Library.encode(
-    //                     bytes(
-    //                         string(
-    //                             abi.encodePacked(
-    //                                 '{"name": "FRAME Edition 0, Token #',
-    //                                 Library.toString(_tokenId),
-    //                                 '", "description": "FRAME tokens are fully customizable on-chain pixel art. Edition 0 is a collection of 32x32 Moose avatars.", "image": "data:image/svg+xml;base64,',
-    //                                 Library.encode(
-    //                                     bytes(configToSVG(tokenConfig))
-    //                                 ),
-    //                                 '","attributes":',
-    //                                 configToMetadata(tokenConfig),
-    //                                 "}"
-    //                             )
-    //                         )
-    //                     )
-    //                 )
-    //             )
-    //         );
-    // }
+        return
+            string(
+                abi.encodePacked(
+                    "data:application/json;base64,",
+                    Library.encode(
+                        bytes(
+                            string(
+                                abi.encodePacked(
+                                    '{"name": "STRIPES Token #',
+                                    Library.toString(_tokenId),
+                                    '", "description": "STRIPES is a generative on-chain art project. Each image contains 10 randomly generated animated stripes. The SVG is created by a contract function, with all storage on the blockchain. No IPFS, no API.", "image": "data:image/svg+xml;base64,',
+                                    Library.encode(
+                                        bytes(configToSVG(tokenConfig))
+                                    ),
+                                    '","attributes":',
+                                    '""',
+                                    "}"
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+    }
 
     /**
      * @dev Returns a config for a given tokenId
@@ -352,34 +268,5 @@ contract MetisNFT is ERC721Enumerable, Ownable {
             tokensId[i] = tokenOfOwnerByIndex(_wallet, i);
         }
         return tokensId;
-    }
-
-//     /*
-//   ___   __    __  ____     ___  ____       _____  __ __  ____     __ ______  ____  ___   ____   _____
-//  /   \ |  |__|  ||    \   /  _]|    \     |     ||  |  ||    \   /  ]      ||    |/   \ |    \ / ___/
-// |     ||  |  |  ||  _  | /  [_ |  D  )    |   __||  |  ||  _  | /  /|      | |  ||     ||  _  (   \_ 
-// |  O  ||  |  |  ||  |  ||    _]|    /     |  |_  |  |  ||  |  |/  / |_|  |_| |  ||  O  ||  |  |\__  |
-// |     ||  `  '  ||  |  ||   [_ |    \     |   _] |  :  ||  |  /   \_  |  |   |  ||     ||  |  |/  \ |
-// |     | \      / |  |  ||     ||  .  \    |  |   |     ||  |  \     | |  |   |  ||     ||  |  |\    |
-//  \___/   \_/\_/  |__|__||_____||__|\_|    |__|    \__,_||__|__|\____| |__|  |____|\___/ |__|__| \___|
-                                                                                                     
-//     */
-
-//     /**
-//      * @dev Sets the ERC20 token address
-//      * @param _traxAddress The token address
-//      */
-
-//     function setTraxAddress(address _traxAddress) public onlyOwner {
-//         traxAddress = _traxAddress;
-//     }
-
-   /**
-     * @dev Sets the trait library address
-     * @param _libraryAddress The token address
-     */
-
-    function setLibraryAddress(address _libraryAddress) public onlyOwner {
-        libraryAddress = _libraryAddress;
     }
 }
